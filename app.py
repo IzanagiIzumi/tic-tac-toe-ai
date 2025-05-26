@@ -1,13 +1,24 @@
 import os
-from flask import Flask, request, jsonify
 import numpy as np
+from flask import Flask, request, jsonify
 from flask_cors import CORS
 
 app = Flask(__name__)
 CORS(app)
 
 # Load the trained Q-table
-q_table = np.load("q_table.npy", allow_pickle=True)
+try:
+    q_table = np.load("q_table.npy", allow_pickle=True)
+except FileNotFoundError:
+    print("❌ q_table.npy not found! Make sure you've run train.py.")
+    q_table = np.zeros((3**9, 9))  # fallback: empty table
+
+def state_to_index(state):
+    index = 0
+    for i in range(9):
+        index *= 3
+        index += state[i]
+    return index
 
 @app.route("/", methods=["GET"])
 def home():
@@ -16,29 +27,24 @@ def home():
 @app.route("/move", methods=["POST"])
 def move():
     data = request.get_json()
-    state = list(data.get("state", []))
+    state = data.get("state")
 
-    if not state or len(state) != 9:
+    if not isinstance(state, list) or len(state) != 9:
         return jsonify({"error": "Invalid state"}), 400
 
+    # Convert state to index
     state_index = state_to_index(state)
-    q_values = q_table[state_index]
 
-    # Filter out invalid moves
+    # Get Q-values and filter for valid moves
+    q_values = q_table[state_index]
     valid_moves = [i for i in range(9) if state[i] == 0]
+
     if not valid_moves:
         return jsonify({"error": "No valid moves"}), 400
 
-    # Choose best valid move
-    best_move = max(valid_moves, key=lambda a: q_values[a])
+    # Choose best move among valid ones
+    best_move = max(valid_moves, key=lambda i: q_values[i])
     return jsonify({"move": best_move})
-
-def state_to_index(state):
-    index = 0
-    for i in range(9):
-        index *= 3
-        index += state[i]
-    return index
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))

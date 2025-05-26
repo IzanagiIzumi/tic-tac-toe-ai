@@ -15,11 +15,16 @@ def home():
 
 @app.route("/move", methods=["POST"])
 def move():
-    data = request.get_json()
-    state = tuple(data["state"])
-    state_index = state_to_index(state)
-    action = int(np.argmax(q_table[state_index]))
-    return jsonify({"move": action})
+    try:
+        data = request.get_json()
+        state = tuple(data["state"])
+        state_index = state_to_index(state)
+        action = int(np.argmax(q_table[state_index]))
+        return jsonify({"move": action})
+    except Exception as e:
+        print("Error in /move:", e)
+        return jsonify({"error": "Invalid request or internal error"}), 400
+
 
 def state_to_index(state):
     """

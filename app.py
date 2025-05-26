@@ -6,7 +6,7 @@ from flask_cors import CORS
 app = Flask(__name__)
 CORS(app)
 
-# Load Q-table
+# Load the trained Q-table from file
 q_table = np.load("q_table.npy", allow_pickle=True)
 
 @app.route("/", methods=["GET"])
@@ -18,14 +18,25 @@ def move():
     data = request.get_json()
     state = tuple(data["state"])
     state_index = state_to_index(state)
-    action = int(np.argmax(q_table[state_index]))
-    return jsonify({"move": action})
+
+    q_values = q_table[state_index]
+
+    # Find valid (empty) positions
+    valid_moves = [i for i, val in enumerate(state) if val == 0]
+
+    if not valid_moves:
+        return jsonify({"error": "No valid moves left"}), 400
+
+    # Filter Q-values to only valid moves
+    best_move = max(valid_moves, key=lambda move: q_values[move])
+
+    return jsonify({"move": best_move})
 
 def state_to_index(state):
+    """Converts a 9-element board state into a base-3 index"""
     index = 0
-    for i in range(9):
-        index *= 3
-        index += state[i]
+    for val in state:
+        index = index * 3 + val
     return index
 
 if __name__ == "__main__":
